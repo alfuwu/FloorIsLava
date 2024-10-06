@@ -1,0 +1,64 @@
+DeathMessages: {
+	TouchedGround_1: "{0} touched the ground"
+	TouchedGround_2: "{0} has had enough"
+	TouchedGround_3: "{0} misunderstood the challenge"
+	TouchedGround_4: "{0} went outside and touched some grass"
+	TouchedGround_5: "{0} had a fear of heights and desperately needed to touch the ground"
+	TouchedGround_6: "{0}'s hand slipped off their grappling hook"
+	TouchedGround_7: "{0} wondered what would happen if they touched the ground with their pinky toe"
+}
+
+Configs: {
+	FloorIsLavaConfig: {
+		DisplayName: Config
+
+		SpawnGracePeriod: {
+			Label: Spawn Grace Period
+			Tooltip:
+				'''
+				Players will not die from standing on the ground during this grace period (in seconds)
+				The grace period will apply to players right after they respawn and when they join a world
+				'''
+		}
+
+		DeathDelay: {
+			Label: Death Delay
+			Tooltip: The amount of time (in ticks) a player must be on the ground before being killed
+		}
+
+		PlayersSpawnWithSquirrelHook: {
+			Label: Players Spawn With Squirrel Hook
+			Tooltip: Gives new characters a squirrel hook by default
+		}
+
+		SpawnPlayersInAir: {
+			Label: Spawn Players in Air
+			Tooltip: Spawns players 20 blocks in the sky, rather than directly on the ground
+		}
+
+		NerfWings: {
+			Label: "[i:493] Nerf Wings"
+			Tooltip: Halves flight time of all wings
+		}
+
+		NerfMounts: {
+			Label: "[i:2430] Nerf Mounts"
+			Tooltip: Gives all mounts a maximum duration they can be summoned for, along with a cooldown period afterwards
+		}
+
+		NerfMinecarts: {
+			Label: "[i:2343] Nerf Minecarts"
+			Tooltip: Gives minecarts a maximum duration they can be ridden for, along with a cooldown period afterwards
+		}
+
+		NerfNeptunesShell: {
+			Label: "[i:497] Nerf Neptune's Shell"
+			Tooltip: Disables full breath immunity of [i:497] Neptune's Shell, instead only acting as an upgrade to the [i:268] Diving Helmet
+		}
+
+		NerfSoaringInsignia: {
+			Label: "[i:4989] Nerf Soaring Insignia"
+			Tooltip: Disables the infinite flight time of the [i:4989] Soaring Insignia, instead only lengthening the time for all wings
+		}
+	}
+}
