@@ -1,6 +1,6 @@
 displayName = The Floor is Lava
 author = alfuwu
-version = 9999.9999.9999.32083
+version = 1.32083
 hideCode = false
 hideResources = false
 includeSource = true
