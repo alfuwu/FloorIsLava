@@ -4,6 +4,7 @@ using MonoMod.Cil;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Reflection;
 using Terraria;
 using Terraria.DataStructures;
@@ -14,21 +15,36 @@ using Terraria.ModLoader.Config;
 
 namespace FloorIsLava;
 
+// yippee massive file
 public class FloorIsLava : Mod {
+    private static readonly MethodInfo getConfig = typeof(FloorIsLavaConfig).GetMethod("GetInstance", BindingFlags.Public | BindingFlags.Static, []);
+
     public const string Localization = $"Mods.{nameof(FloorIsLava)}";
 
     public override void Load() {
+        IL_Player.CheckDrowning += CheckDrowning;
+        IL_Player.Update += Update;
         IL_Player.WingMovement += WingMovement;
 
+        On_Player.GrappleMovement += OnGrappleMovement;
         On_Player.Spawn_SetPositionAtWorldSpawn += OnSpawn_SetPositionAtWorldSpawn;
         On_Player.WingMovement += OnWingMovement;
     }
 
     public override void Unload() {
+        IL_Player.CheckDrowning -= CheckDrowning;
+        IL_Player.Update -= Update;
         IL_Player.WingMovement -= WingMovement;
 
+        On_Player.GrappleMovement -= OnGrappleMovement;
         On_Player.Spawn_SetPositionAtWorldSpawn -= OnSpawn_SetPositionAtWorldSpawn;
         On_Player.WingMovement -= OnWingMovement;
+    }
+
+    private void OnGrappleMovement(On_Player.orig_GrappleMovement orig, Player self) {
+        orig(self);
+        if (FloorIsLavaConfig.GetInstance().ResetWingFlightTimeOnGrapple && self.grappling[0] > -1)
+            self.wingTime = self.wingTimeMax;
     }
 
     private void OnSpawn_SetPositionAtWorldSpawn(On_Player.orig_Spawn_SetPositionAtWorldSpawn orig, Player self) {
@@ -43,6 +59,50 @@ public class FloorIsLava : Mod {
             self.wingTime += 0.25f;
     }
 
+    private void CheckDrowning(ILContext il) {
+        try {
+            ILCursor c = new(il);
+            ILLabel skip = null;
+            c.GotoNext(i => i.MatchLdarg0(),
+                i => i.MatchLdfld(typeof(Player).GetField("accMerman", BindingFlags.Public | BindingFlags.Instance)),
+                i => i.MatchBrfalse(out skip));
+            c.Emit(OpCodes.Call, getConfig);
+            c.Emit(OpCodes.Call, ConfigVariable("NerfNeptunesShell"));
+            c.Emit(OpCodes.Brtrue_S, skip);
+            c.GotoNext(MoveType.After, i => i.MatchCall(typeof(Player).GetMethod("get_breathCDMax", BindingFlags.Public | BindingFlags.Instance)));
+            ILLabel vanilla = il.DefineLabel();
+            c.Emit(OpCodes.Call, getConfig);
+            c.Emit(OpCodes.Call, ConfigVariable("NerfNeptunesShell"));
+            c.Emit(OpCodes.Brfalse_S, vanilla);
+            c.Emit(OpCodes.Ldc_I4, 8);
+            c.Emit(OpCodes.Mul);
+            c.MarkLabel(vanilla);
+        } catch (Exception e) {
+            MonoModHooks.DumpIL(this, il);
+            throw new ILPatchFailureException(this, il, e);
+        }
+    }
+
+    private void Update(ILContext il) {
+        try {
+            ILCursor c = new(il);
+            ILLabel skip = null;
+            c.GotoNext(i => i.MatchLdarg0(),
+                i => i.MatchLdfld(typeof(Player).GetField("empressBrooch", BindingFlags.Public | BindingFlags.Instance)),
+                i => i.MatchBrfalse(out skip),
+                i => i.MatchLdarg0(),
+                i => i.MatchLdarg0(),
+                i => i.MatchLdfld(typeof(Player).GetField("rocketTimeMax", BindingFlags.Public | BindingFlags.Instance)));
+            c.GotoNext(i => i.MatchLdarg0());
+            c.Emit(OpCodes.Call, getConfig);
+            c.Emit(OpCodes.Call, ConfigVariable("NerfSoaringInsignia"));
+            c.Emit(OpCodes.Brtrue_S, skip);
+        } catch (Exception e) {
+            MonoModHooks.DumpIL(this, il);
+            throw new ILPatchFailureException(this, il, e);
+        }
+    }
+
     private void WingMovement(ILContext il) {
         try {
             ILCursor c = new(il);
@@ -50,18 +110,19 @@ public class FloorIsLava : Mod {
                 i => i.MatchLdarg0(),
                 i => i.MatchLdfld(typeof(Player).GetField("wingTimeMax", BindingFlags.Public | BindingFlags.Instance)),
                 i => i.MatchConvR4());
-            c.Emit(OpCodes.Call, typeof(FloorIsLavaConfig).GetMethod("GetInstance", BindingFlags.Public | BindingFlags.Static, []));
-            c.Emit(OpCodes.Call, typeof(FloorIsLavaConfig).GetMethod("get_NerfSoaringInsignia", BindingFlags.Public | BindingFlags.Instance));
             ILLabel ret = il.DefineLabel();
+            c.Emit(OpCodes.Call, getConfig);
+            c.Emit(OpCodes.Call, ConfigVariable("NerfSoaringInsignia"));
             c.Emit(OpCodes.Brtrue_S, ret);
             c.GotoNext(i => i.MatchRet());
             c.MarkLabel(ret);
-            MonoModHooks.DumpIL(this, il);
         } catch (Exception e) {
             MonoModHooks.DumpIL(this, il);
             throw new ILPatchFailureException(this, il, e);
         }
     }
+
+    private static MethodInfo ConfigVariable(string name) => typeof(FloorIsLavaConfig).GetMethod("get_" + name, BindingFlags.Public | BindingFlags.Instance);
 }
 
 public class FloorIsLavaConfig : ModConfig {
@@ -82,15 +143,16 @@ public class FloorIsLavaConfig : ModConfig {
     public bool SpawnPlayersInAir { get; set; }
 
     [DefaultValue(true)]
+    public bool ResetWingFlightTimeOnGrapple { get; set; }
+
+    [DefaultValue(true)]
     [ReloadRequired]
     public bool NerfWings { get; set; }
 
     [DefaultValue(true)]
-    [ReloadRequired]
     public bool NerfMounts { get; set; }
 
     [DefaultValue(false)]
-    [ReloadRequired]
     public bool NerfMinecarts { get; set; }
 
     [DefaultValue(true)]
@@ -111,8 +173,10 @@ public class FloorIsLavaConfig : ModConfig {
 public class GroundAllergicPlayer : ModPlayer {
     private int ticks = 0;
     private int ticksOnGround = 0;
-    private List<int> hooks = [];
-    private const int grappleLife = 1000;
+    private int mountTime = 0;
+    private const int maxMountTime = 1800; // 30 sec
+
+    private static string GetRandomPlayerName(Player excluded) => Main.rand.NextFromList(Main.player.Where(p => p.active && !p.dead && p != excluded).Any() ? Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name).ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
 
     public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath) {
         if (Player.miscEquips[4].IsAir && FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
@@ -124,14 +188,25 @@ public class GroundAllergicPlayer : ModPlayer {
         ticks++;
         Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.height / 10 + 1);
         bool onTile = Collision.SolidTiles(feetPosition, Player.width / 2, Player.height / 10, true);
-        
+
         if (ticks >= FloorIsLavaConfig.GetInstance(out var cfg).SpawnGracePeriod * 60 && onTile)
             ticksOnGround++;
         else
             ticksOnGround = 0;
         if (ticksOnGround > cfg.DeathDelay)
-            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 7)}", Player.name)),
+            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 25)}", Player.name, GetRandomPlayerName(Player))),
                 42500 + Main.rand.Next(15000), 0);
+        if (Player.mount.Active && (cfg.NerfMounts && !MountID.Sets.Cart[Player.mount.Type] || !cfg.NerfMounts && cfg.NerfMinecarts)) {
+            mountTime++;
+        } else if (mountTime > 0) {
+            mountTime = 0;
+            Player.AddBuff(ModContent.BuffType<MountPhobia>(), Math.Max(300, (int)(600 * (float)mountTime / maxMountTime)));
+        }
+        if (mountTime > maxMountTime) {
+            Player.mount.Dismount(Player);
+            mountTime = 0;
+            Player.AddBuff(ModContent.BuffType<MountPhobia>(), 600);
+        }
     }
 
     public override void OnEnterWorld() {
@@ -151,7 +226,19 @@ public class WingNerf : GlobalItem {
     public override void SetDefaults(Item item) {
         if (FloorIsLavaConfig.GetInstance().NerfWings) {
             WingStats o = ArmorIDs.Wing.Sets.Stats[item.wingSlot];
-            ArmorIDs.Wing.Sets.Stats[item.wingSlot] = new((int)(o.FlyTime / 1.4f), o.AccRunSpeedOverride, o.AccRunAccelerationMult, o.HasDownHoverStats, o.DownHoverSpeedOverride, o.DownHoverAccelerationMult);
+            ArmorIDs.Wing.Sets.Stats[item.wingSlot] = new((int)(o.FlyTime / 1.2f), o.AccRunSpeedOverride, o.AccRunAccelerationMult, o.HasDownHoverStats, o.DownHoverSpeedOverride, o.DownHoverAccelerationMult);
         }
+    }
+}
+
+// content
+public class MountPhobia : ModBuff {
+    public override void SetStaticDefaults() {
+        Main.debuff[Type] = true;
+    }
+
+    public override void Update(Player player, ref int buffIndex) {
+        if (player.mount.Active)
+            player.mount.Dismount(player);
     }
 }

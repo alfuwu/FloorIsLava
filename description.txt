@@ -1,1 +1,15 @@
-The Floor is Lava is a challenge mod that kills players when they touch the ground, forcing them to 
+The Floor is Lava is a challenge mod that kills players when they touch the ground, forcing them to, well, not touch the ground.
+
+There are a few modifications to vanilla mechanics done to make this mod more difficult, even late-game, where mobility would normally drastically increase. All of these changes are optional and can be disabled in the mod's config if you wish.
+
+These changes include:
+ - reset wing flight time when grappling (allows use of wings)
+ - lower maximum flight time for all wings
+ - make all mounts finite in duration
+ - make all minecarts finite in duration (disabled by default)
+ - prevent the Neptune's Shell and all of its upgrades from providing the player with infinite breath underwater, instead changing it to act as an upgrade to the Diving Helmet/Diving Gear
+ - prevent the Soaring Insignia from granting infinite flight, instead giving the player who has the Soaring Insignia equipped a longer maximum flight time
+
+Additionally, some early game changes include:
+ - all new characters spawn with a Squirrel Hook in their grappling hook slot
+ - players spawn 20 tiles above world spawn (note: they do not spawn 20 tiles above other spawnpoints, such as those set by beds)

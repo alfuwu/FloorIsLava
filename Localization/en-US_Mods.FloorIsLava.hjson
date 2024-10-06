@@ -3,9 +3,27 @@ DeathMessages: {
 	TouchedGround_2: "{0} has had enough"
 	TouchedGround_3: "{0} misunderstood the challenge"
 	TouchedGround_4: "{0} went outside and touched some grass"
-	TouchedGround_5: "{0} had a fear of heights and desperately needed to touch the ground"
+	TouchedGround_5: "{0} had a fear of heights and desperately needed to step on the ground"
 	TouchedGround_6: "{0}'s hand slipped off their grappling hook"
 	TouchedGround_7: "{0} wondered what would happen if they touched the ground with their pinky toe"
+	TouchedGround_8: "{0} thought the rules didn't apply to them"
+	TouchedGround_9: "{0} tripped in midair"
+	TouchedGround_10: "{0} forgot the ground was lava"
+	TouchedGround_11: "{0} decided to take a walk"
+	TouchedGround_12: "{0} thought it'd be a good idea to stretch their legs a bit"
+	TouchedGround_13: "{0} bounced"
+	TouchedGround_14: "{0} did not channel their inner squirrel"
+	TouchedGround_15: "{0} grappled too close to the sun"
+	TouchedGround_16: "{1} told {0} that the ground was perfectly safe"
+	TouchedGround_17: "{1} touched th- oh, wait, wrong person, uhm, ah, right here, let's see... oh, I've run out of spac"
+	TouchedGround_18: "{0} had a ground allergy"
+	TouchedGround_19: "{0} saw a cute bunny and tried to walk over and say hi"
+	TouchedGround_20: "{0} was so paranoid that {1} was going to push them onto the ground that they did it to themselves so {1} couldn't"
+	TouchedGround_21: "{0} tried throwing the remote onto the ground but somehow threw themselves instead"
+	TouchedGround_22: "{0} flew too close to the ground"
+	TouchedGround_23: "{0} didn't want to live in the same world as {1}"
+	TouchedGround_24: "{0} got too eager and accidentally slipped onto the ground"
+	TouchedGround_25: "{0} tried tip-toeing on the ground but it didn't work"
 }
 
 Configs: {
@@ -36,6 +54,11 @@ Configs: {
 			Tooltip: Spawns players 20 blocks in the sky, rather than directly on the ground
 		}
 
+		ResetWingFlightTimeOnGrapple: {
+			Label: Reset Wing Flight Time on Grapple
+			Tooltip: Resets flight time when grappling onto a tile
+		}
+
 		NerfWings: {
 			Label: "[i:493] Nerf Wings"
 			Tooltip: Halves flight time of all wings
@@ -60,5 +83,12 @@ Configs: {
 			Label: "[i:4989] Nerf Soaring Insignia"
 			Tooltip: Disables the infinite flight time of the [i:4989] Soaring Insignia, instead only lengthening the time for all wings
 		}
+	}
+}
+
+Buffs: {
+	MountPhobia: {
+		DisplayName: Mount Phobia
+		Description: You can't get back on your mount
 	}
 }
