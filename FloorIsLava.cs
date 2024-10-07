@@ -49,8 +49,7 @@ public class FloorIsLava : Mod {
 
     private void OnSpawn_SetPositionAtWorldSpawn(On_Player.orig_Spawn_SetPositionAtWorldSpawn orig, Player self) {
         orig(self);
-        if (FloorIsLavaConfig.GetInstance().SpawnPlayersInAir)
-            self.position.Y -= 320;
+        self.position.Y -= FloorIsLavaConfig.GetInstance().SpawnHeightIncrease * 20;
     }
 
     private void OnWingMovement(On_Player.orig_WingMovement orig, Player self) {
@@ -74,8 +73,17 @@ public class FloorIsLava : Mod {
             c.Emit(OpCodes.Call, getConfig);
             c.Emit(OpCodes.Call, ConfigVariable("NerfNeptunesShell"));
             c.Emit(OpCodes.Brfalse_S, vanilla);
+            c.Emit(OpCodes.Ldarg_0);
+            c.Emit(OpCodes.Ldfld, typeof(Player).GetField("accMerman", BindingFlags.Public | BindingFlags.Instance));
+            c.Emit(OpCodes.Brfalse_S, vanilla);
             c.Emit(OpCodes.Ldc_I4, 8);
             c.Emit(OpCodes.Mul);
+            c.Emit(OpCodes.Ldarg_0);
+            // if the player is wearing a diving helmet, divide by four to make the combo not completely broken
+            c.Emit(OpCodes.Ldfld, typeof(Player).GetField("accDivingHelm", BindingFlags.Public | BindingFlags.Instance));
+            c.Emit(OpCodes.Brfalse_S, vanilla);
+            c.Emit(OpCodes.Ldc_I4, 4);
+            c.Emit(OpCodes.Div);
             c.MarkLabel(vanilla);
         } catch (Exception e) {
             MonoModHooks.DumpIL(this, il);
@@ -139,8 +147,9 @@ public class FloorIsLavaConfig : ModConfig {
     [DefaultValue(true)]
     public bool PlayersSpawnWithSquirrelHook { get; set; }
 
-    [DefaultValue(true)]
-    public bool SpawnPlayersInAir { get; set; }
+    [DefaultValue(20)]
+    [Range(0, int.MaxValue)]
+    public int SpawnHeightIncrease { get; set; }
 
     [DefaultValue(true)]
     public bool ResetWingFlightTimeOnGrapple { get; set; }
@@ -156,11 +165,20 @@ public class FloorIsLavaConfig : ModConfig {
     public bool NerfMinecarts { get; set; }
 
     [DefaultValue(true)]
-    [ReloadRequired]
     public bool NerfNeptunesShell { get; set; }
 
     [DefaultValue(true)]
     public bool NerfSoaringInsignia { get; set; }
+
+    [DefaultValue(false)]
+    [ReloadRequired]
+    public bool NerfGrapplingHooks { get; set; }
+
+    [DefaultValue(false)]
+    public bool NerfLiquids { get; set; }
+
+    [DefaultValue(false)]
+    public bool ReallyNerfLiquids { get; set; }
 
     public static FloorIsLavaConfig GetInstance() => ModContent.GetInstance<FloorIsLavaConfig>();
 
@@ -176,6 +194,35 @@ public class GroundAllergicPlayer : ModPlayer {
     private int mountTime = 0;
     private const int maxMountTime = 1800; // 30 sec
 
+    private static bool LiquidCollision(Vector2 position, int width, int height) {
+        int value = (int)(position.X / 16f) - 1;
+        int value2 = (int)((position.X + width) / 16f) + 2;
+        int value3 = (int)(position.Y / 16f) - 1;
+        int value4 = (int)((position.Y + height) / 16f) + 2;
+        int num = Utils.Clamp(value, 0, Main.maxTilesX - 1);
+        value2 = Utils.Clamp(value2, 0, Main.maxTilesX - 1);
+        value3 = Utils.Clamp(value3, 0, Main.maxTilesY - 1);
+        value4 = Utils.Clamp(value4, 0, Main.maxTilesY - 1);
+        Vector2 vector;
+        for (int i = num; i < value2; i++) {
+            for (int j = value3; j < value4; j++) {
+                if (Main.tile[i, j] != null && Main.tile[i, j].LiquidAmount > 0) {
+                    vector.X = i * 16;
+                    vector.Y = j * 16;
+                    int num2 = 16;
+                    float num3 = 256 - Main.tile[i, j].LiquidAmount;
+                    num3 /= 32f;
+                    vector.Y += num3 * 2f;
+                    num2 -= (int)(num3 * 2f);
+                    if (position.X + width > vector.X && position.X < vector.X + 16f && position.Y + height > vector.Y && position.Y < vector.Y + num2)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static string GetRandomPlayerName(Player excluded) => Main.rand.NextFromList(Main.player.Where(p => p.active && !p.dead && p != excluded).Any() ? Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name).ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
 
     public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath) {
@@ -186,17 +233,23 @@ public class GroundAllergicPlayer : ModPlayer {
 
     public override void PostUpdate() {
         ticks++;
-        Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.height / 10 + 1);
-        bool onTile = Collision.SolidTiles(feetPosition, Player.width / 2, Player.height / 10, true);
+        Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.gravDir * Player.height / 10 + 1);
+        int height = (int)(Player.gravDir * Player.height / 10);
+        bool onTile = Collision.SolidTiles(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
+        bool inLiquid = LiquidCollision(feetPosition - new Vector2(0, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? 0 : 1), Player.width / 2, height);
 
-        if (ticks >= FloorIsLavaConfig.GetInstance(out var cfg).SpawnGracePeriod * 60 && onTile)
+        if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
             ticksOnGround = 0;
-        if (ticksOnGround > cfg.DeathDelay)
-            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 25)}", Player.name, GetRandomPlayerName(Player))),
-                42500 + Main.rand.Next(15000), 0);
-        if (Player.mount.Active && (cfg.NerfMounts && !MountID.Sets.Cart[Player.mount.Type] || !cfg.NerfMounts && cfg.NerfMinecarts)) {
+        if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI)
+            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 53)}", Player.name, GetRandomPlayerName(Player))),
+                42500 + Main.rand.Next(15000), 0, dodgeable: false);
+        if (cfg.NerfLiquids && inLiquid) {
+            Player.Hurt(PlayerDeathReason.ByOther(2), 20, 0, dodgeable: false);
+            Player.AddBuff(BuffID.OnFire, 120);
+        }
+        if (Player.mount.Active && (cfg.NerfMounts && !MountID.Sets.Cart[Player.mount.Type] || cfg.NerfMounts && cfg.NerfMinecarts)) {
             mountTime++;
         } else if (mountTime > 0) {
             mountTime = 0;
@@ -221,14 +274,34 @@ public class GroundAllergicPlayer : ModPlayer {
 }
 
 public class WingNerf : GlobalItem {
-    public override bool AppliesToEntity(Item item, bool lateInstantiation) => ArmorIDs.Wing.Sets.Stats.IndexInRange(item.wingSlot) && ArmorIDs.Wing.Sets.Stats[item.wingSlot].FlyTime > 0;
+    public override bool AppliesToEntity(Item item, bool lateInstantiation) => FloorIsLavaConfig.GetInstance().NerfWings && ArmorIDs.Wing.Sets.Stats.IndexInRange(item.wingSlot) && ArmorIDs.Wing.Sets.Stats[item.wingSlot].FlyTime > 0;
 
     public override void SetDefaults(Item item) {
-        if (FloorIsLavaConfig.GetInstance().NerfWings) {
-            WingStats o = ArmorIDs.Wing.Sets.Stats[item.wingSlot];
-            ArmorIDs.Wing.Sets.Stats[item.wingSlot] = new((int)(o.FlyTime / 1.2f), o.AccRunSpeedOverride, o.AccRunAccelerationMult, o.HasDownHoverStats, o.DownHoverSpeedOverride, o.DownHoverAccelerationMult);
-        }
+        WingStats o = ArmorIDs.Wing.Sets.Stats[item.wingSlot];
+        ArmorIDs.Wing.Sets.Stats[item.wingSlot] = new((int)(o.FlyTime / 1.2f), o.AccRunSpeedOverride, o.AccRunAccelerationMult, o.HasDownHoverStats, o.DownHoverSpeedOverride, o.DownHoverAccelerationMult);
     }
+}
+
+public class GrapplingHookNerf : GlobalProjectile {
+    private static bool IsModdedGrapple(Projectile proj) { // i hope mods dont put unrelated logic in any of these functions
+        if (proj.ModProjectile != null) {
+            int nGrappleHooks = 3;
+            float grappleRetreatSpeed = 11f;
+            float grapplePullSpeed = 11f;
+            float x = proj.position.X;
+            float y = proj.position.Y;
+            proj.ModProjectile.NumGrappleHooks(Main.player[proj.owner], ref nGrappleHooks);
+            proj.ModProjectile.GrappleRetreatSpeed(Main.player[proj.owner], ref grappleRetreatSpeed);
+            proj.ModProjectile.GrapplePullSpeed(Main.player[proj.owner], ref grapplePullSpeed);
+            proj.ModProjectile.GrappleTargetPoint(Main.player[proj.owner], ref x, ref y);
+            return nGrappleHooks != 3 || grappleRetreatSpeed != 11f || grapplePullSpeed != 11f || x != proj.position.X || y != proj.position.Y || proj.ModProjectile.CanUseGrapple(Main.player[proj.owner]) != null || proj.ModProjectile.GrappleRange() != 300 || proj.ModProjectile.GrappleCanLatchOnTo(Main.player[proj.owner], (int)proj.position.X / 16, (int)proj.position.Y / 16) != null;
+        }
+        return false;
+    }
+
+    public override bool AppliesToEntity(Projectile proj, bool lateInstantiation) => FloorIsLavaConfig.GetInstance().NerfGrapplingHooks && (ProjectileID.Sets.SingleGrappleHook[proj.type] || proj.aiStyle == ProjAIStyleID.Hook || IsModdedGrapple(proj));
+    
+    public override void SetDefaults(Projectile proj) => proj.timeLeft = 60;
 }
 
 // content
