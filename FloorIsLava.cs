@@ -194,6 +194,44 @@ public class GroundAllergicPlayer : ModPlayer {
     private int mountTime = 0;
     private const int maxMountTime = 1800; // 30 sec
 
+    private  static bool SolidCollision(Vector2 position, int width, int height, bool acceptTopSurfaces) {
+        int value = (int)(position.X / 16f) - 1;
+        int value2 = (int)((position.X + width) / 16f) + 2;
+        int value3 = (int)(position.Y / 16f) - 1;
+        int value4 = (int)((position.Y + height) / 16f) + 2;
+        int num = Utils.Clamp(value, 0, Main.maxTilesX - 1);
+        value2 = Utils.Clamp(value2, 0, Main.maxTilesX - 1);
+        value3 = Utils.Clamp(value3, 0, Main.maxTilesY - 1);
+        value4 = Utils.Clamp(value4, 0, Main.maxTilesY - 1);
+        Vector2 vector = default;
+        for (int i = num; i < value2; i++) {
+            for (int j = value3; j < value4; j++) {
+                Tile tile = Main.tile[i, j];
+                if (!tile.HasTile || tile.IsActuated)
+                    continue;
+
+                bool flag = Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
+                if (acceptTopSurfaces)
+                    flag |= Main.tileSolidTop[tile.TileType];
+
+                if (flag) {
+                    vector.X = i * 16;
+                    vector.Y = j * 16;
+                    int num2 = 16;
+                    if (tile.IsHalfBlock) {
+                        vector.Y += 8f;
+                        num2 -= 8;
+                    }
+
+                    if (position.X + width > vector.X && position.X < vector.X + 16f && position.Y + height > vector.Y && position.Y < vector.Y + num2)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static bool LiquidCollision(Vector2 position, int width, int height) {
         int value = (int)(position.X / 16f) - 1;
         int value2 = (int)((position.X + width) / 16f) + 2;
@@ -248,9 +286,9 @@ public class GroundAllergicPlayer : ModPlayer {
         ticks++;
         Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.gravDir * Player.height / 10 + Player.gravDir);
         int height = (int)(Player.gravDir * Player.height / 10);
-        bool onTile = Collision.SolidTiles(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
+        bool onTile = SolidCollision(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
-
+        Mod.Logger.Info(onTile);
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
@@ -258,7 +296,7 @@ public class GroundAllergicPlayer : ModPlayer {
         if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI)
             Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 64)}", Player.name, GetRandomPlayerName(Player))),
                 42500 + Main.rand.Next(15000), 0, dodgeable: false);
-        if (cfg.NerfLiquids && inLiquid) {
+        else if (cfg.NerfLiquids && inLiquid) {
             Player.Hurt(PlayerDeathReason.ByOther(2), 20, 0, dodgeable: false);
             Player.AddBuff(BuffID.OnFire, 120);
         }
