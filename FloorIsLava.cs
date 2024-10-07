@@ -23,7 +23,8 @@ public class FloorIsLava : Mod {
 
     public override void Load() {
         IL_Player.CheckDrowning += CheckDrowning;
-        IL_Player.Update += Update;
+        if (!ModLoader.HasMod("CalamityMod")) // calamity already does this exact IL edit, so skip doing it if calamity is loaded
+            IL_Player.Update += Update;
         IL_Player.WingMovement += WingMovement;
 
         On_Player.GrappleMovement += OnGrappleMovement;
@@ -33,7 +34,8 @@ public class FloorIsLava : Mod {
 
     public override void Unload() {
         IL_Player.CheckDrowning -= CheckDrowning;
-        IL_Player.Update -= Update;
+        if (!ModLoader.HasMod("CalamityMod"))
+            IL_Player.Update -= Update;
         IL_Player.WingMovement -= WingMovement;
 
         On_Player.GrappleMovement -= OnGrappleMovement;
@@ -95,13 +97,11 @@ public class FloorIsLava : Mod {
         try {
             ILCursor c = new(il);
             ILLabel skip = null;
-            c.GotoNext(i => i.MatchLdarg0(),
+            c.GotoNext(MoveType.After, i => i.MatchLdarg0(),
+                i => i.MatchLdfld(typeof(Player).GetField("empressBrooch", BindingFlags.Public | BindingFlags.Instance)));
+            c.GotoNext(MoveType.After, i => i.MatchLdarg0(),
                 i => i.MatchLdfld(typeof(Player).GetField("empressBrooch", BindingFlags.Public | BindingFlags.Instance)),
-                i => i.MatchBrfalse(out skip),
-                i => i.MatchLdarg0(),
-                i => i.MatchLdarg0(),
-                i => i.MatchLdfld(typeof(Player).GetField("rocketTimeMax", BindingFlags.Public | BindingFlags.Instance)));
-            c.GotoNext(i => i.MatchLdarg0());
+                i => i.MatchBrfalse(out skip));
             c.Emit(OpCodes.Call, getConfig);
             c.Emit(OpCodes.Call, ConfigVariable("NerfSoaringInsignia"));
             c.Emit(OpCodes.Brtrue_S, skip);
@@ -226,24 +226,24 @@ public class GroundAllergicPlayer : ModPlayer {
     private static string GetRandomPlayerName(Player excluded) => Main.rand.NextFromList(Main.player.Where(p => p.active && !p.dead && p != excluded).Any() ? Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name).ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
 
     public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath) {
-        if (Player.miscEquips[4].IsAir && FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
+        if (FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
             Player.miscEquips[4] = new(ItemID.SquirrelHook);
         return [];
     }
 
     public override void PostUpdate() {
         ticks++;
-        Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.gravDir * Player.height / 10 + 1);
+        Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.gravDir * Player.height / 10 + Player.gravDir);
         int height = (int)(Player.gravDir * Player.height / 10);
         bool onTile = Collision.SolidTiles(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
-        bool inLiquid = LiquidCollision(feetPosition - new Vector2(0, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? 0 : 1), Player.width / 2, height);
+        bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
 
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
             ticksOnGround = 0;
         if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI)
-            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 53)}", Player.name, GetRandomPlayerName(Player))),
+            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 64)}", Player.name, GetRandomPlayerName(Player))),
                 42500 + Main.rand.Next(15000), 0, dodgeable: false);
         if (cfg.NerfLiquids && inLiquid) {
             Player.Hurt(PlayerDeathReason.ByOther(2), 20, 0, dodgeable: false);
@@ -311,7 +311,7 @@ public class MountPhobia : ModBuff {
     }
 
     public override void Update(Player player, ref int buffIndex) {
-        if (player.mount.Active)
+        if (player.mount.Active && (FloorIsLavaConfig.GetInstance(out var cfg).NerfMounts && !MountID.Sets.Cart[player.mount.Type] || cfg.NerfMounts && cfg.NerfMinecarts))
             player.mount.Dismount(player);
     }
 }
