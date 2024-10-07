@@ -288,7 +288,6 @@ public class GroundAllergicPlayer : ModPlayer {
         int height = (int)(Player.gravDir * Player.height / 10);
         bool onTile = SolidCollision(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
-        Mod.Logger.Info(onTile);
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
