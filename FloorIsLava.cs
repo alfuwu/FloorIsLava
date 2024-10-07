@@ -223,12 +223,25 @@ public class GroundAllergicPlayer : ModPlayer {
         return false;
     }
 
+    private bool FindItemByType(int itemType, out int index) => (index = Array.FindIndex(Player.inventory, item => item.type == itemType)) >= 0 || (index = Player.miscEquips[4].type == itemType ? 59 : -1) == 59;
+
     private static string GetRandomPlayerName(Player excluded) => Main.rand.NextFromList(Main.player.Where(p => p.active && !p.dead && p != excluded).Any() ? Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name).ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
 
     public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath) {
         if (FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
-            Player.miscEquips[4] = new(ItemID.SquirrelHook);
+            if (Player.miscEquips[4].IsAir && !mediumCoreDeath)
+                Player.miscEquips[4] = new(ItemID.SquirrelHook);
+            else if (mediumCoreDeath && FindItemByType(ItemID.SquirrelHook, out int idx))
+                if (idx == 59)
+                    Player.miscEquips[4].TurnToAir();
+                else
+                    Player.inventory[idx].TurnToAir();
         return [];
+    }
+
+    public override void Kill(double damage, int hitDirection, bool pvp, PlayerDeathReason damageSource) {
+        if (Player.difficulty == PlayerDifficultyID.MediumCore && FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
+            Player.miscEquips[4] = new(ItemID.SquirrelHook);
     }
 
     public override void PostUpdate() {
