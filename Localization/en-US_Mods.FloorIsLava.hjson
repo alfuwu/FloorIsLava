@@ -63,6 +63,7 @@ DeathMessages: {
 	TouchedGround_62: "{0} tried to breakdance in the air but slipped and touched the ground."
 	TouchedGround_63: "{0} fumbled their grappling hook."
 	TouchedGround_64: "{0} tried to use their grappling hook, but {1} stole it."
+	TouchedGround_65: "{0} wondered whether the ground was still lava or not."
 }
 
 Configs: {

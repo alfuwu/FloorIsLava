@@ -261,16 +261,17 @@ public class GroundAllergicPlayer : ModPlayer {
         return false;
     }
 
-    private bool FindItemByType(int itemType, out int index) => (index = Array.FindIndex(Player.inventory, item => item.type == itemType)) >= 0 || (index = Player.miscEquips[4].type == itemType ? 59 : -1) == 59;
+    private bool FindItemByType(int itemType, out int index) => (index = Array.FindIndex(Player.inventory, item => item.type == itemType)) >= 0 || (index = Player.miscEquips[4].type == itemType ? -2 : -1) == -2;
 
-    private static string GetRandomPlayerName(Player excluded) => Main.rand.NextFromList(Main.player.Where(p => p.active && !p.dead && p != excluded).Any() ? Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name).ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
+    // god this is cursed, but it should be faster than the old version of the function
+    private static string GetRandomPlayerName(Player excluded, IEnumerable<string> names = null) => Main.rand.NextFromList((names = Main.player.Where(p => p.active && !p.dead && p != excluded).Select(p => p.name)).Any() ? names.ToArray() : ["Bob", "Joe", "Dave", "Phillip", "Jerry", "Jasmine", "Sarah", "Miu", "Alfred", "Jesus", "Mother Teresa", "Fabsol", "Maxwell", "Ezkli", "Jeffrey"]);
 
     public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath) {
         if (FloorIsLavaConfig.GetInstance().PlayersSpawnWithSquirrelHook)
             if (Player.miscEquips[4].IsAir && !mediumCoreDeath)
                 Player.miscEquips[4] = new(ItemID.SquirrelHook);
             else if (mediumCoreDeath && FindItemByType(ItemID.SquirrelHook, out int idx))
-                if (idx == 59)
+                if (idx == -2)
                     Player.miscEquips[4].TurnToAir();
                 else
                     Player.inventory[idx].TurnToAir();
@@ -293,13 +294,13 @@ public class GroundAllergicPlayer : ModPlayer {
         else
             ticksOnGround = 0;
         if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI)
-            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(1, 64)}", Player.name, GetRandomPlayerName(Player))),
+            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(64) + 1}", Player.name, GetRandomPlayerName(Player))),
                 42500 + Main.rand.Next(15000), 0, dodgeable: false);
         else if (cfg.NerfLiquids && inLiquid) {
             Player.Hurt(PlayerDeathReason.ByOther(2), 20, 0, dodgeable: false);
             Player.AddBuff(BuffID.OnFire, 120);
         }
-        if (Player.mount.Active && (cfg.NerfMounts && !MountID.Sets.Cart[Player.mount.Type] || cfg.NerfMounts && cfg.NerfMinecarts)) {
+        if (Player.mount.Active && (cfg.NerfMounts && !MountID.Sets.Cart[Player.mount.Type] || MountID.Sets.Cart[Player.mount.Type] && cfg.NerfMinecarts)) {
             mountTime++;
         } else if (mountTime > 0) {
             mountTime = 0;
@@ -335,16 +336,20 @@ public class WingNerf : GlobalItem {
 public class GrapplingHookNerf : GlobalProjectile {
     private static bool IsModdedGrapple(Projectile proj) { // i hope mods dont put unrelated logic in any of these functions
         if (proj.ModProjectile != null) {
-            int nGrappleHooks = 3;
-            float grappleRetreatSpeed = 11f;
-            float grapplePullSpeed = 11f;
-            float x = proj.position.X;
-            float y = proj.position.Y;
-            proj.ModProjectile.NumGrappleHooks(Main.player[proj.owner], ref nGrappleHooks);
-            proj.ModProjectile.GrappleRetreatSpeed(Main.player[proj.owner], ref grappleRetreatSpeed);
-            proj.ModProjectile.GrapplePullSpeed(Main.player[proj.owner], ref grapplePullSpeed);
-            proj.ModProjectile.GrappleTargetPoint(Main.player[proj.owner], ref x, ref y);
-            return nGrappleHooks != 3 || grappleRetreatSpeed != 11f || grapplePullSpeed != 11f || x != proj.position.X || y != proj.position.Y || proj.ModProjectile.CanUseGrapple(Main.player[proj.owner]) != null || proj.ModProjectile.GrappleRange() != 300 || proj.ModProjectile.GrappleCanLatchOnTo(Main.player[proj.owner], (int)proj.position.X / 16, (int)proj.position.Y / 16) != null;
+            try {
+                int nGrappleHooks = 3;
+                float grappleRetreatSpeed = 11f;
+                float grapplePullSpeed = 11f;
+                float x = proj.position.X;
+                float y = proj.position.Y;
+                proj.ModProjectile.NumGrappleHooks(Main.player[proj.owner], ref nGrappleHooks);
+                proj.ModProjectile.GrappleRetreatSpeed(Main.player[proj.owner], ref grappleRetreatSpeed);
+                proj.ModProjectile.GrapplePullSpeed(Main.player[proj.owner], ref grapplePullSpeed);
+                proj.ModProjectile.GrappleTargetPoint(Main.player[proj.owner], ref x, ref y);
+                return nGrappleHooks != 3 || grappleRetreatSpeed != 11f || grapplePullSpeed != 11f || x != proj.position.X || y != proj.position.Y || proj.ModProjectile.CanUseGrapple(Main.player[proj.owner]) != null || proj.ModProjectile.GrappleRange() != 300 || proj.ModProjectile.GrappleCanLatchOnTo(Main.player[proj.owner], (int)proj.position.X / 16, (int)proj.position.Y / 16) != null;
+            } catch {
+                return true;
+            }
         }
         return false;
     }
@@ -361,7 +366,7 @@ public class MountPhobia : ModBuff {
     }
 
     public override void Update(Player player, ref int buffIndex) {
-        if (player.mount.Active && (FloorIsLavaConfig.GetInstance(out var cfg).NerfMounts && !MountID.Sets.Cart[player.mount.Type] || cfg.NerfMounts && cfg.NerfMinecarts))
+        if (player.mount.Active && (FloorIsLavaConfig.GetInstance(out var cfg).NerfMounts && !MountID.Sets.Cart[player.mount.Type] || MountID.Sets.Cart[player.mount.Type] && cfg.NerfMinecarts))
             player.mount.Dismount(player);
     }
 }
