@@ -155,6 +155,9 @@ public class FloorIsLavaConfig : ModConfig {
     public bool ResetWingFlightTimeOnGrapple { get; set; }
 
     [DefaultValue(true)]
+    public bool SofterFloorDetection { get; set; }
+
+    [DefaultValue(true)]
     [ReloadRequired]
     public bool NerfWings { get; set; }
 
@@ -289,6 +292,13 @@ public class GroundAllergicPlayer : ModPlayer {
         int height = (int)(Player.gravDir * Player.height / 10);
         bool onTile = SolidCollision(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
+
+        foreach (Point p in Player.TouchedTiles)
+            if (Main.tile[p.X, p.Y].HasTile)
+                onTile = true; // helps detect slops/half blocks
+        if (cfg.SofterFloorDetection)
+            onTile &= Math.Abs(Player.velocity.Y) < 0.01f;
+
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
