@@ -99,9 +99,14 @@ Configs: {
 			Tooltip: Resets flight time when grappling onto a tile
 		}
 
-		SofterFoorDetection: {
+		SofterFloorDetection: {
 			Label: Softer Floor Detection
-			Tooltip: Decreases the strictness of floor detection, allowing moving upwards through platforms, etc.
+			Tooltip: Decreases the strictness of floor detection, allowing moving upwards through platforms, etc
+		}
+
+		RespectImmunityFrames: {
+			Label: Respect Immunity Frames
+			Tooltip: Whether the mod should respect immunity frames when damaging the player for stepping on the ground
 		}
 
 		NerfWings: {
@@ -142,16 +147,6 @@ Configs: {
 		ReallyNerfLiquids: {
 			Label: "[i:207] Really Nerf Liquids"
 			Tooltip: Makes all liquid instantly kill players
-		}
-
-		SofterFloorDetection: {
-			Label: Softer Floor Detection
-			Tooltip: ""
-		}
-
-		RespectImmunityFrames: {
-			Label: Respect Immunity Frames
-			Tooltip: ""
 		}
 	}
 }
