@@ -148,6 +148,11 @@ Configs: {
 			Label: Softer Floor Detection
 			Tooltip: ""
 		}
+
+		RespectImmunityFrames: {
+			Label: Respect Immunity Frames
+			Tooltip: ""
+		}
 	}
 }
 

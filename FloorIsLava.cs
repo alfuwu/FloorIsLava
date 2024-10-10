@@ -158,6 +158,9 @@ public class FloorIsLavaConfig : ModConfig {
     public bool SofterFloorDetection { get; set; }
 
     [DefaultValue(true)]
+    public bool RespectImmunityFrames { get; set; }
+
+    [DefaultValue(true)]
     [ReloadRequired]
     public bool NerfWings { get; set; }
 
@@ -288,25 +291,35 @@ public class GroundAllergicPlayer : ModPlayer {
 
     public override void PostUpdate() {
         ticks++;
-        Vector2 feetPosition = Player.position + new Vector2(Player.width / 4, 9 * Player.gravDir * Player.height / 10 + Player.gravDir);
+        bool basicallyNotMoving = Math.Abs(Player.velocity.Y) < 0.01f;
+        Vector2 feetPosition = Player.position + new Vector2(basicallyNotMoving ? 0 : Player.width / 4, 9 * Player.gravDir * Player.height / 10 + Player.gravDir);
         int height = (int)(Player.gravDir * Player.height / 10);
-        bool onTile = SolidCollision(feetPosition, Player.width / 2, height, true) && !Player.shimmering;
+        bool onTile = SolidCollision(feetPosition, basicallyNotMoving ? Player.width : Player.width / 2, height, true) && !Player.shimmering;
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
 
         foreach (Point p in Player.TouchedTiles)
-            if (Main.tile[p.X, p.Y].HasTile)
+            if (Main.tile[p.X, p.Y].HasTile && Player.gravDir > 0 ? p.Y * 16 > Player.Center.Y : p.Y * 16 < Player.Center.Y)
                 onTile = true; // helps detect slops/half blocks
         if (cfg.SofterFloorDetection)
-            onTile &= Math.Abs(Player.velocity.Y) < 0.01f;
+            onTile &= basicallyNotMoving;
 
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
         else
             ticksOnGround = 0;
-        if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI)
-            Player.Hurt(PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(64) + 1}", Player.name, GetRandomPlayerName(Player))),
-                42500 + Main.rand.Next(15000), 0, dodgeable: false);
-        else if (cfg.NerfLiquids && inLiquid) {
+        if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI) {
+            PlayerDeathReason reason = PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(64) + 1}", Player.name, GetRandomPlayerName(Player)));
+            if (cfg.RespectImmunityFrames)
+                Player.Hurt(reason,
+                    42500 + Main.rand.Next(15000), 0, dodgeable: false);
+            else
+                Player.Hurt(new Player.HurtInfo() {
+                    DamageSource = reason,
+                    Damage = 42500 + Main.rand.Next(15000),
+                    HitDirection = 0,
+                    Dodgeable = false
+                });
+        } else if (cfg.NerfLiquids && inLiquid) {
             Player.Hurt(PlayerDeathReason.ByOther(2), 20, 0, dodgeable: false);
             Player.AddBuff(BuffID.OnFire, 120);
         }
