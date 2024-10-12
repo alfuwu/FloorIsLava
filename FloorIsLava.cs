@@ -188,10 +188,7 @@ public class FloorIsLavaConfig : ModConfig {
 
     public static FloorIsLavaConfig GetInstance() => ModContent.GetInstance<FloorIsLavaConfig>();
 
-    public static FloorIsLavaConfig GetInstance(out FloorIsLavaConfig cfg) {
-        cfg = GetInstance();
-        return cfg;
-    }
+    public static FloorIsLavaConfig GetInstance(out FloorIsLavaConfig cfg) => cfg = GetInstance();
 }
 
 public class GroundAllergicPlayer : ModPlayer {
@@ -294,7 +291,7 @@ public class GroundAllergicPlayer : ModPlayer {
         bool basicallyNotMoving = Math.Abs(Player.velocity.Y) < 0.01f;
         Vector2 feetPosition = Player.position + new Vector2(basicallyNotMoving ? 0 : Player.width / 4, 9 * Player.gravDir * Player.height / 10 + Player.gravDir);
         int height = (int)(Player.gravDir * Player.height / 10);
-        bool onTile = SolidCollision(feetPosition, basicallyNotMoving ? Player.width : Player.width / 2, height, true) && !Player.shimmering;
+        bool onTile = SolidCollision(feetPosition, basicallyNotMoving ? Player.width : Player.width / 2, height, true) && !Player.shimmering && !Player.pulley;
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
 
         foreach (Point p in Player.TouchedTiles)
@@ -305,8 +302,8 @@ public class GroundAllergicPlayer : ModPlayer {
 
         if (ticks >= cfg.SpawnGracePeriod * 60 && (onTile || cfg.ReallyNerfLiquids && inLiquid))
             ticksOnGround++;
-        else
-            ticksOnGround = 0;
+        else if (ticksOnGround > 0)
+            ticksOnGround--;
         if (ticksOnGround > cfg.DeathDelay && Main.myPlayer == Player.whoAmI) {
             PlayerDeathReason reason = PlayerDeathReason.ByCustomReason(Language.GetTextValue($"{FloorIsLava.Localization}.DeathMessages.TouchedGround_{Main.rand.Next(64) + 1}", Player.name, GetRandomPlayerName(Player)));
             if (cfg.RespectImmunityFrames)
@@ -384,9 +381,7 @@ public class GrapplingHookNerf : GlobalProjectile {
 
 // content
 public class MountPhobia : ModBuff {
-    public override void SetStaticDefaults() {
-        Main.debuff[Type] = true;
-    }
+    public override void SetStaticDefaults() => Main.debuff[Type] = true;
 
     public override void Update(Player player, ref int buffIndex) {
         if (player.mount.Active && (FloorIsLavaConfig.GetInstance(out var cfg).NerfMounts && !MountID.Sets.Cart[player.mount.Type] || MountID.Sets.Cart[player.mount.Type] && cfg.NerfMinecarts))
