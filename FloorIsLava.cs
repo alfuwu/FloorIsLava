@@ -295,7 +295,7 @@ public class GroundAllergicPlayer : ModPlayer {
         bool inLiquid = LiquidCollision(Player.position + new Vector2(Player.width / 4, FloorIsLavaConfig.GetInstance(out var cfg).ReallyNerfLiquids ? Player.gravDir : 0), Player.width / 2, Player.height);
 
         foreach (Point p in Player.TouchedTiles)
-            if (Main.tile[p.X, p.Y].HasTile && Player.gravDir > 0 ? p.Y * 16 > Player.Center.Y : p.Y * 16 < Player.Center.Y)
+            if (Main.tile[p.X, p.Y].HasTile && Main.tile[p.X, p.Y].Slope != SlopeType.Solid && Player.gravDir > 0 ? p.Y * 16 > Player.Center.Y : p.Y * 16 < Player.Center.Y)
                 onTile = true; // helps detect slops/half blocks
         if (cfg.SofterFloorDetection)
             onTile &= basicallyNotMoving;
